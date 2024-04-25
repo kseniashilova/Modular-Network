@@ -87,6 +87,9 @@ def enumerate_motifs_parallel(G,hash_to_motif):
 
 
 def save_motifs(matrix):
+
+    matrix = np.nan_to_num(matrix, nan=0)
+
     print('save_motifs is running')
     z_scores_list = []
     hash_to_motif = {}

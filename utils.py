@@ -8,4 +8,4 @@ def save_matrix(matrix, path):
 def load_matrix(path):
     # Load the matrix
     loaded_matrix = np.load(path)
-    print(loaded_matrix)
+    return loaded_matrix
