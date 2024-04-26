@@ -20,5 +20,5 @@ spike_trains = get_spike_trains_sliding_window(binary_spike_trains, window_size=
 
 # Get functional matrix
 func_mat = cross_correlation_matrix(spike_trains, lag_limit=10)
-# save_matrix(func_mat, 'func_matrix.npy')
-save_motifs(func_mat)
+save_matrix(func_mat, 'func_matrix.npy')
+#save_motifs(func_mat)
