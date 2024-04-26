@@ -3,6 +3,7 @@ import networkx as nx
 import numpy as np
 from collections import Counter
 from multiprocessing import Pool
+import time
 
 from matplotlib import pyplot as plt
 from tqdm import tqdm
@@ -131,7 +132,11 @@ def save_motifs(matrix):
     G = nx.from_numpy_array(matrix, create_using=nx.DiGraph)
     if G.size() >= 3:
         print('enumerate_motifs for G is running')
+        start_time = time.time()
         original_motifs, hash_to_motif = enumerate_motifs_parallel(G, hash_to_motif)
+        end_time = time.time()
+        print("Matrix size: ", len(G.nodes()))
+        print("Time spent - the original graph: {:.2f} seconds".format(end_time - start_time))
         # original_motifs, hash_to_motif = enumerate_motifs(G, hash_to_motif)
 
         # generate reference networks and count motifs
@@ -141,7 +146,11 @@ def save_motifs(matrix):
         print('enumerate_motifs for G_ref is running')
         for _ in tqdm(range(num_references)):
             G_ref = generate_reference_network(G)
+            start_time = time.time()
             motifs_ref, hash_to_motif = enumerate_motifs_parallel(G_ref, hash_to_motif)
+            end_time = time.time()
+            print("Matrix size: ", len(G_ref.nodes()))
+            print("Time spent - ref random graph: {:.2f} seconds".format(end_time - start_time))
             # motifs_ref, hash_to_motif = enumerate_motifs(G_ref, hash_to_motif)
             reference_motifs_list.append(motifs_ref)
 

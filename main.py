@@ -5,7 +5,7 @@ from motifs import *
 from utils import *
 
 # Read image
-image = get_any_image(path='naturalscene.png', draw=False, scaling=0.02)
+image = get_any_image(path='naturalscene.png', draw=False, scaling=0.03)
 
 # Simulate the network
 simulation_time = 200
