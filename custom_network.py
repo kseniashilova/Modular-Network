@@ -159,20 +159,20 @@ def set_spike_rec(modules):
     return spike_recorder
 
 
-def run_network(image, neurons_per_module, simulation_time):
+def run_network(image, neurons_per_module, simulation_time, multiplier):
 
     modules = create_modules_spatial(num_modules=2, grid_shape=image.shape,
                                      neurons_per_module=neurons_per_module)
     print('Image shape = ', image.shape,
           'Number of neurons = ', image.shape[0] * image.shape[1])
 
-    add_input(image, modules[0], multiplier=2)
+    add_input(image, modules[0], multiplier=multiplier)
 
     spike_recorder = set_spike_rec(modules)
 
     nest.Simulate(simulation_time)
 
-    plot_spike_data(spike_recorder, num_steps=150)
+    plot_spike_data(spike_recorder, num_steps=None)
     number_of_neurons = (neurons_per_module * (len(modules) - 1) +
                          image.shape[0] * image.shape[1])
     return number_of_neurons, spike_recorder

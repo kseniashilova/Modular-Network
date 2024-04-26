@@ -36,6 +36,7 @@ def enumerate_motifs(G, hash_to_motif):
     return motifs_counter, hash_to_motif
 
 
+
 def generate_reference_network(G):
 
     in_degrees = [d for n, d in G.in_degree()]
@@ -62,6 +63,39 @@ def motif_z_scores(original_motifs, reference_motifs):
     return z_scores
 
 
+def create_graph(edges):
+    """ Helper function to create a graph based on the list of edges """
+    G = nx.DiGraph()
+    G.add_edges_from(edges)
+    return G
+
+def motif_hash_dictionary():
+    """ Construct specific motifs manually and return their hashes """
+    motifs = [
+        [(1, 2), (2, 3)],  # 1 -> 2 -> 3
+        [(1, 2), (2, 3), (3, 1)],  # 1 -> 2 -> 3 -> 1
+        [(1, 2), (2, 1), (2, 3), (3, 2)],  # 1 <-> 2 <-> 3
+        [(1, 2), (1, 3)]  # 1 -> 2, 1 -> 3
+    ]
+    motif_hashes = {}
+    for name, edges in motifs:
+        G = create_graph(edges)
+        motif_hashes[name] = nx.weisfeiler_lehman_graph_hash(G, iterations=2)
+    return motif_hashes
+
+
+def find_motifs_in_graph(G, motif_hashes):
+    """ Find and count occurrences of predefined motifs in a given graph G """
+    count = Counter()
+    for triplet in itertools.permutations(G.nodes(), 3):
+        subgraph = G.subgraph(triplet)
+        subgraph_hash = nx.weisfeiler_lehman_graph_hash(subgraph, iterations=2)
+        for motif_name, hash_val in motif_hashes.items():
+            if subgraph_hash == hash_val:
+                count[motif_name] += 1
+    return count
+
+
 
 def parallel_enumerate_motifs(args):
     G, triplet = args
@@ -70,7 +104,7 @@ def parallel_enumerate_motifs(args):
     return motif_hash, nx.to_numpy_array(subgraph)
 
 
-def enumerate_motifs_parallel(G,hash_to_motif):
+def enumerate_motifs_parallel(G, hash_to_motif):
     pool = Pool()
     triplets = list(itertools.combinations(G.nodes(), 3))
     results = pool.map(parallel_enumerate_motifs, [(G, triplet) for triplet in triplets])
@@ -98,6 +132,7 @@ def save_motifs(matrix):
     if G.size() >= 3:
         print('enumerate_motifs for G is running')
         original_motifs, hash_to_motif = enumerate_motifs_parallel(G, hash_to_motif)
+        # original_motifs, hash_to_motif = enumerate_motifs(G, hash_to_motif)
 
         # generate reference networks and count motifs
         num_references = 5  # number of reference networks
@@ -107,6 +142,7 @@ def save_motifs(matrix):
         for _ in tqdm(range(num_references)):
             G_ref = generate_reference_network(G)
             motifs_ref, hash_to_motif = enumerate_motifs_parallel(G_ref, hash_to_motif)
+            # motifs_ref, hash_to_motif = enumerate_motifs(G_ref, hash_to_motif)
             reference_motifs_list.append(motifs_ref)
 
         z_scores = motif_z_scores(original_motifs, reference_motifs_list)

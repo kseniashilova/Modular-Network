@@ -5,12 +5,12 @@ from motifs import *
 from utils import *
 
 # Read image
-image = get_any_image(path='naturalscene.png', draw=False, scaling=0.05)
+image = get_any_image(path='naturalscene.png', draw=False, scaling=0.02)
 
 # Simulate the network
 simulation_time = 200
-number_of_neurons, spike_recorder = run_network(image, neurons_per_module=50,
-                                                simulation_time=simulation_time)
+number_of_neurons, spike_recorder = run_network(image, neurons_per_module=20,
+                                                simulation_time=simulation_time, multiplier=100)
 
 # Getting spike trains
 binary_spike_trains = get_spike_trains(number_of_neurons, simulation_time,
@@ -20,4 +20,5 @@ spike_trains = get_spike_trains_sliding_window(binary_spike_trains, window_size=
 
 # Get functional matrix
 func_mat = cross_correlation_matrix(spike_trains, lag_limit=10)
-save_matrix(func_mat, 'func_matrix.npy')
+# save_matrix(func_mat, 'func_matrix.npy')
+save_motifs(func_mat)
