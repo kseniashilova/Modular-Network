@@ -137,6 +137,7 @@ def save_motifs(matrix):
         end_time = time.time()
         print("Matrix size: ", len(G.nodes()))
         print("Time spent - the original graph: {:.2f} seconds".format(end_time - start_time))
+        print(hash_to_motif)
         # original_motifs, hash_to_motif = enumerate_motifs(G, hash_to_motif)
 
         # generate reference networks and count motifs

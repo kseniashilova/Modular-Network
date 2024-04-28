@@ -3,6 +3,7 @@ import nest
 import networkx as nx
 import matplotlib.pyplot as plt
 from images_work import *
+from nest.lib.hl_api_exceptions import NESTErrors
 
 
 def plot_network_structure():
@@ -23,16 +24,22 @@ def plot_network_structure():
     plt.show()
 
 
+def set_spike_rec(modules):
+    spike_recorder = nest.Create('spike_recorder')
+    # nest.Connect(modules[1], spike_recorder)
+    for module in modules:
+        nest.Connect(module, spike_recorder)
+    return spike_recorder
+
+
 def plot_spike_data(spike_recorder, num_steps=None):
     spike_data = nest.GetStatus(spike_recorder, 'events')[0]
     senders = spike_data['senders']
     times = spike_data['times']
-    print(senders.shape, times.shape)
     if num_steps is not None:
         mask = times < num_steps
         times = times[mask]
         senders = senders[mask]
-    print(senders.shape, times.shape)
     # Plotting the spike data
     plt.figure(figsize=(10, 5))
     plt.plot(times, senders, '.')
@@ -60,67 +67,91 @@ def add_input(image, module, multiplier=1):
     # nest.Connect(dc_gen, module)
 
 
-# old
-def create_structure(num_modules=3, neurons_per_module=1):
-    modules = []
-    for i in range(num_modules):
-        module = nest.Create('iaf_psc_alpha', neurons_per_module)
-        modules.append(module)
-
-    # Connect Neurons within Modules
-    syn_spec_intra = {'weight': 2.0, 'delay': 1.0}
-    for module in modules:
-        nest.Connect(module, module, 'all_to_all', syn_spec=syn_spec_intra)
-
-    modules = connect_neurons_between_modules(modules)
-    return modules
+def valid_parameters(params, V_reset):
+    if np.all(params['V_th'] > V_reset):
+        return True
+    else:
+        return False
 
 
-def create_module_spatial_random(neurons_per_module=10, mult=20):
-    x_positions = np.random.uniform(low=0.0, high=1.0, size=neurons_per_module)
-    y_positions = np.random.uniform(low=0.0, high=1.0, size=neurons_per_module)
+def create_heterogeneous_neurons(size, positions, std_dev_factor=0.1):
+    defaults = nest.GetDefaults('iaf_psc_alpha')
+
+    ready_params = False  # flag to set random params (sometimes there is nest error because of thresholds)
+    while not ready_params:
+        # new params dict
+        new_params = {
+            'tau_m': np.random.normal(loc=defaults['tau_m'], scale=defaults['tau_m'] * std_dev_factor, size=size),
+            'tau_syn_ex': np.random.normal(loc=defaults['tau_syn_ex'], scale=defaults['tau_syn_ex'] * std_dev_factor,
+                                           size=size),
+            'tau_syn_in': np.random.normal(loc=defaults['tau_syn_in'], scale=defaults['tau_syn_in'] * std_dev_factor,
+                                           size=size),
+            't_ref': np.random.normal(loc=defaults['t_ref'], scale=defaults['t_ref'] * std_dev_factor, size=size),
+            'V_th': np.random.normal(loc=defaults['V_th'], scale=np.abs(defaults['V_th']) * std_dev_factor, size=size),
+
+        }
+        if (valid_parameters(new_params, defaults['V_reset'])):
+            neurons = nest.Create('iaf_psc_alpha', positions=positions)
+            for param, values in new_params.items():
+                nest.SetStatus(neurons, param, values.flatten().tolist())
+            ready_params = True
+        else:
+            ready_params = False
+
+
+
+
+    return neurons
+
+
+def create_module_spatial(neurons, mult=20):
+    conn_dict = {
+        'rule': 'pairwise_bernoulli',
+        'p': 1,  # Connection probability
+        'mask': {'circular': {'radius': 0.4}}
+    }
+
+    # Define synaptic specification separately if needed
+    syn_spec = {
+        'weight': mult * nest.spatial.distance,  # Using distance to scale the weight
+        'delay': 1.5
+    }
+
+    # Connect the layers
+    nest.Connect(neurons, neurons, conn_dict, syn_spec)
+    return neurons
+
+
+def create_module_spatial_grid(heterogeneous=True, grid_shape=[10, 10], mult=20):
+    size = grid_shape[0] * grid_shape[1]
+    positions = nest.spatial.grid(shape=grid_shape)
+
+    if heterogeneous:
+        neurons = create_heterogeneous_neurons(size, positions, std_dev_factor=0.1)
+    else:
+        neurons = nest.Create('iaf_psc_alpha', positions=positions)
+
+    #nest.SetStatus(neurons, {'positions': positions})
+    neurons = create_module_spatial(neurons, mult=mult)
+    return neurons
+
+
+
+
+def create_module_spatial_random(heterogeneous=True, size=100, mult=20):
+    x_positions = np.random.uniform(low=0.0, high=1.0, size=size)
+    y_positions = np.random.uniform(low=0.0, high=1.0, size=size)
     random_positions = [[x, y] for x, y in zip(x_positions, y_positions)]
+    random_positions = nest.spatial.free(random_positions)
 
-    # Create neurons with random positions
-    random_layer = nest.Create('iaf_psc_alpha',
-                               positions=nest.spatial.free(random_positions))
-
-    conn_dict = {
-        'rule': 'pairwise_bernoulli',
-        'p': 1,  # Connection probability
-        'mask': {'circular': {'radius': 0.4}}
-    }
-
-    # Define synaptic specification separately if needed
-    syn_spec = {
-        'weight': mult * nest.spatial.distance,  # Using distance to scale the weight
-        'delay': 1.5
-    }
-
-    # Connect the layers
-    nest.Connect(random_layer, random_layer, conn_dict, syn_spec)
-
-    return random_layer
+    if heterogeneous:
+        neurons = create_heterogeneous_neurons(size, random_positions, std_dev_factor=0.1)
+    else:
+        neurons = nest.Create('iaf_psc_alpha', positions=random_positions)
 
 
-def create_module_spatial_grid(grid_shape=[10, 10], mult=20):
-    grid_layer = nest.Create('iaf_psc_alpha',
-                             positions=nest.spatial.grid(shape=grid_shape))
-    conn_dict = {
-        'rule': 'pairwise_bernoulli',
-        'p': 1,  # Connection probability
-        'mask': {'circular': {'radius': 0.4}}
-    }
-
-    # Define synaptic specification separately if needed
-    syn_spec = {
-        'weight': mult * nest.spatial.distance,  # Using distance to scale the weight
-        'delay': 1.5
-    }
-
-    # Connect the layers
-    nest.Connect(grid_layer, grid_layer, conn_dict, syn_spec)
-    return grid_layer
+    neurons = create_module_spatial(neurons, mult=mult)
+    return neurons
 
 
 def connect_neurons_between_modules(modules, connection_probability=0.2, weight=1.0, delay=1.5):
@@ -137,36 +168,27 @@ def connect_neurons_between_modules(modules, connection_probability=0.2, weight=
     return modules
 
 
-def create_modules_spatial(num_modules=3, grid_shape=[10, 10], neurons_per_module=10):
+def create_modules_spatial(num_modules=3, grid_shape=[10, 10], neurons_per_module=10, mult=20):
     # Connect Neurons between Modules
     modules = []
-    layer1 = create_module_spatial_grid(grid_shape=grid_shape)
+    layer1 = create_module_spatial_grid(heterogeneous=True, grid_shape=grid_shape, mult=mult)
     modules.append(layer1)
 
     for i in range(1, num_modules):
-        modules.append(create_module_spatial_random(neurons_per_module=neurons_per_module))
+        modules.append(create_module_spatial_random(heterogeneous=True, size=neurons_per_module, mult=mult))
 
     modules = connect_neurons_between_modules(modules, connection_probability=0.3,
                                               weight=45, delay=1.5)
     return modules
 
 
-def set_spike_rec(modules):
-    spike_recorder = nest.Create('spike_recorder')
-    # nest.Connect(modules[1], spike_recorder)
-    for module in modules:
-        nest.Connect(module, spike_recorder)
-    return spike_recorder
-
-
-def run_network(image, neurons_per_module, simulation_time, multiplier):
-
+def run_network(image, neurons_per_module, simulation_time, multiplier_input, multiplier_weights):
     modules = create_modules_spatial(num_modules=2, grid_shape=image.shape,
-                                     neurons_per_module=neurons_per_module)
+                                     neurons_per_module=neurons_per_module, mult=multiplier_weights)
     print('Image shape = ', image.shape,
           'Number of neurons = ', image.shape[0] * image.shape[1])
 
-    add_input(image, modules[0], multiplier=multiplier)
+    add_input(image, modules[0], multiplier=multiplier_input)
 
     spike_recorder = set_spike_rec(modules)
 

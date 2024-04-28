@@ -59,6 +59,7 @@ def cross_correlation(data1, data2, lag_limit=10):
 def cross_correlation_matrix(spike_trains, lag_limit=10):
     n = len(spike_trains)
     ccg_mat = np.zeros((n, n))
+    print('CCG is working')
     for i in tqdm(range(n)):
         for j in range(i + 1, n):
             ccg_mat[i, j] = cross_correlation(spike_trains[i], spike_trains[j], lag_limit=lag_limit)

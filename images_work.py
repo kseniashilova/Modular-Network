@@ -7,23 +7,29 @@ import matplotlib.pyplot as plt
 def get_any_image(path, draw=False, scaling=0.1):
     img = Image.open(path)
     img = img.convert("L")
-    width,height = np.array(img).shape[:2]
+    width, height = np.array(img).shape[:2]
     resized_image = img.resize((int(scaling*height), int(scaling*width)), Image.LANCZOS)
     if draw:
         fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(10, 5))
         axes[0].imshow(img, cmap='gray')
-        axes[0].set_title('original')
-        axes[0].axis('off')
+        axes[0].set_title(f'original, shape: {np.array(img).shape}')
 
         # Plot the second image
         axes[1].imshow(resized_image, cmap='gray')
-        axes[1].set_title('Resized')
-        axes[1].axis('off')
+        axes[1].set_title(f'resized, shape: {np.array(resized_image).shape}')
+
+        for ax in axes:
+            ax.axis('off')
+            ax.set_xticks([])
+            ax.set_yticks([])
+            for spine in ax.spines.values():
+                spine.set_visible(False)
 
         plt.tight_layout()
         plt.show()
 
     resized_image = np.array(resized_image)
+    print('Resized image shape: ', resized_image.shape)
     return resized_image
 
 
@@ -42,5 +48,3 @@ def get_one_image(draw=True):
         plt.show()
 
     return image
-
-get_any_image('naturalscene.png', True)
