@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 
 def draw_motif(arr, title, name):
+    print(arr)
     G = nx.from_numpy_array(arr, create_using=nx.DiGraph)
     plt.figure(figsize=(4, 3))
     pos = nx.spring_layout(G)  # Generate a layout for nodes
@@ -18,6 +19,29 @@ def draw_motif(arr, title, name):
             arrows=True, arrowsize=20)
     plt.title(title, size=15)
     plt.savefig(name, bbox_inches='tight')
+
+
+def draw_motif_sign(arr, title, name):
+    print(arr)
+    G = nx.from_numpy_array(arr, create_using=nx.DiGraph)
+    plt.figure(figsize=(4, 3))
+    pos = nx.spring_layout(G)
+    nx.draw_networkx_nodes(G, pos, node_color='skyblue', node_size=700)
+
+    edges = G.edges(data=True)
+    positive_edges = [(u, v) for u, v, d in edges if d['weight'] > 0]
+    negative_edges = [(u, v) for u, v, d in edges if d['weight'] < 0]
+
+    nx.draw_networkx_edges(G, pos, edgelist=positive_edges, edge_color='green',
+                           arrows=True, arrowsize=20, width=2)
+    nx.draw_networkx_edges(G, pos, edgelist=negative_edges, edge_color='red',
+                           arrows=True, arrowsize=20, width=2, style='dashed')
+
+    # nx.draw_networkx_labels(G, pos, font_size=15)
+
+    plt.title(title, size=15)
+    plt.savefig(name, bbox_inches='tight')
+    plt.close()
 
 
 def enumerate_motifs(G, hash_to_motif):
@@ -121,7 +145,7 @@ def enumerate_motifs_parallel(G, hash_to_motif):
     return motifs_counter, hash_to_motif
 
 
-def save_motifs(matrix):
+def save_motifs(matrix, path):
 
     matrix = np.nan_to_num(matrix, nan=0)
 
@@ -137,7 +161,7 @@ def save_motifs(matrix):
         end_time = time.time()
         print("Matrix size: ", len(G.nodes()))
         print("Time spent - the original graph: {:.2f} seconds".format(end_time - start_time))
-        print(hash_to_motif)
+
         # original_motifs, hash_to_motif = enumerate_motifs(G, hash_to_motif)
 
         # generate reference networks and count motifs
@@ -176,4 +200,4 @@ def save_motifs(matrix):
 
     used_hashes = []
     for hash, score in motif_dict.items():
-        draw_motif(hash_to_motif[hash], "z score = " + str(score), 'iaf_' + hash + '.png')
+        draw_motif_sign(hash_to_motif[hash], "z score = " + str(score), path + '/iaf_' + hash + '.png')
