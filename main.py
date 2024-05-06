@@ -39,7 +39,7 @@ def count_n_neurons(modules):
 np.random.seed(15)
 nest.ResetKernel()
 # Read image
-image = get_any_image(path='naturalscene.png', draw=True, scaling=0.05)
+image = get_any_image(path='naturalscene.png', draw=True, scaling=0.03)
 
 # Simulate the network
 neurons_per_module = 20
