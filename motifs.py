@@ -167,8 +167,7 @@ def save_motifs(matrix, path):
 
         print('enumerate_motifs for G_ref is running')
         for _ in tqdm(range(num_references)):
-            # G_ref = generate_reference_network(G)
-            G_ref = signed_pair_preserving_shuffle(G)
+            G_ref = generate_reference_network(G)
             start_time = time.time()
             motifs_ref, hash_to_motif = enumerate_motifs_parallel(G_ref, hash_to_motif)
             end_time = time.time()
