@@ -71,25 +71,6 @@ def generate_reference_network(G):
     return randomized_graph
 
 
-def signed_pair_preserving_shuffle(G):
-    edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
-    positive_edges = [(u, v, w) for u, v, w in edges if w > 0]
-    negative_edges = [(u, v, w) for u, v, w in edges if w < 0]
-
-    nodes = list(G.nodes())
-    np.random.shuffle(nodes)
-    node_mapping = dict(zip(G.nodes(), nodes))
-
-    G_ref = nx.DiGraph()
-    G_ref.add_nodes_from(G.nodes())
-
-    for u, v, w in positive_edges + negative_edges:
-        new_u, new_v = node_mapping[u], node_mapping[v]
-        G_ref.add_edge(new_u, new_v, weight=w)
-
-    return G_ref
-
-
 def motif_z_scores(original_motifs, reference_motifs):
     """
     Calculate Z-scores for each motif by comparing their counts in the original
