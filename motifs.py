@@ -61,9 +61,7 @@ def enumerate_motifs(G, hash_to_motif):
     return motifs_counter, hash_to_motif
 
 
-
 def generate_reference_network(G):
-
     in_degrees = [d for n, d in G.in_degree()]
     out_degrees = [d for n, d in G.out_degree()]
     randomized_graph = nx.directed_configuration_model(in_degrees, out_degrees, create_using=nx.DiGraph())
@@ -71,6 +69,25 @@ def generate_reference_network(G):
     randomized_graph = nx.DiGraph(randomized_graph)  # Removes parallel edges
     randomized_graph.remove_edges_from(nx.selfloop_edges(randomized_graph))
     return randomized_graph
+
+
+def signed_pair_preserving_shuffle(G):
+    edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
+    positive_edges = [(u, v, w) for u, v, w in edges if w > 0]
+    negative_edges = [(u, v, w) for u, v, w in edges if w < 0]
+
+    nodes = list(G.nodes())
+    np.random.shuffle(nodes)
+    node_mapping = dict(zip(G.nodes(), nodes))
+
+    G_ref = nx.DiGraph()
+    G_ref.add_nodes_from(G.nodes())
+
+    for u, v, w in positive_edges + negative_edges:
+        new_u, new_v = node_mapping[u], node_mapping[v]
+        G_ref.add_edge(new_u, new_v, weight=w)
+
+    return G_ref
 
 
 def motif_z_scores(original_motifs, reference_motifs):
@@ -93,6 +110,7 @@ def create_graph(edges):
     G = nx.DiGraph()
     G.add_edges_from(edges)
     return G
+
 
 def motif_hash_dictionary():
     """ Construct specific motifs manually and return their hashes """
@@ -121,7 +139,6 @@ def find_motifs_in_graph(G, motif_hashes):
     return count
 
 
-
 def parallel_enumerate_motifs(args):
     G, triplet = args
     subgraph = G.subgraph(triplet)
@@ -146,7 +163,6 @@ def enumerate_motifs_parallel(G, hash_to_motif):
 
 
 def save_motifs(matrix, path):
-
     matrix = np.nan_to_num(matrix, nan=0)
 
     print('save_motifs is running')
@@ -170,7 +186,8 @@ def save_motifs(matrix, path):
 
         print('enumerate_motifs for G_ref is running')
         for _ in tqdm(range(num_references)):
-            G_ref = generate_reference_network(G)
+            # G_ref = generate_reference_network(G)
+            G_ref = signed_pair_preserving_shuffle(G)
             start_time = time.time()
             motifs_ref, hash_to_motif = enumerate_motifs_parallel(G_ref, hash_to_motif)
             end_time = time.time()
