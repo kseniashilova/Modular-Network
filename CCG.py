@@ -51,7 +51,7 @@ def find_significant_peaks(ccg, lags, significance_level=4):
         if significant_lag[1] == 1:
             sign_ccg[lags[significant_lag[0]]] = ccg[significant_lag[0]]
         elif significant_lag[1] == -1:
-            sign_ccg[lags[significant_lag[0]]] = -1*ccg[significant_lag[0]]
+            sign_ccg[lags[significant_lag[0]]] = -1 * ccg[significant_lag[0]]
 
     return sign_ccg
 
@@ -63,7 +63,60 @@ def CCG_tau(tau, N, x_A, x_B, lambda_A, lambda_B):
     return numerator / denominator
 
 
-def CCG(M, N, x_A_arr, x_B_arr, t_overall, significance_level=4):
+def CCG(M, N, x_A_arr, x_B_arr, t_overall, significance_level=4, trials_jitter=10):
+    original_ccg = compute_CCG(M, N, x_A_arr, x_B_arr, t_overall, significance_level)
+    expected_jittered_ccg = compute_expected_jittered_ccg(
+        M, N, x_A_arr, x_B_arr, t_overall, significance_level, trials_jitter)
+
+    jitter_corrected_ccg = {key: original_ccg[key] - expected_jittered_ccg[key] for key in original_ccg}
+
+    significant_ccg = find_significant_peaks(list(jitter_corrected_ccg.values()),
+                                             list(jitter_corrected_ccg.keys()),
+                                             significance_level=significance_level)
+    return significant_ccg
+
+
+def jitter_spikes(M, spike_train, jitter_probability=0.3):
+    jittered_spike_trains = []
+    for i_M in range(M):
+        n_bins = len(spike_train[i_M])
+        jittered_spike_train = np.copy(spike_train[i_M])
+
+        # Iterate through each bin in the spike train
+        for i in range(n_bins):
+            if np.random.rand() < jitter_probability:
+                if i > 0 and jittered_spike_train[i] > 0:  # if not the first bin and spikes are present
+                    spikes_to_move = np.random.randint(0, jittered_spike_train[i] + 1)
+                    jittered_spike_train[i] -= spikes_to_move
+                    jittered_spike_train[i - 1] += spikes_to_move
+                if i < n_bins - 1 and jittered_spike_train[i] > 0:  # if not the last bin and spikes are present
+                    spikes_to_move = np.random.randint(0, jittered_spike_train[i] + 1)
+                    jittered_spike_train[i] -= spikes_to_move
+                    jittered_spike_train[i + 1] += spikes_to_move
+        jittered_spike_trains.append(jittered_spike_train)
+
+    return jittered_spike_trains
+
+
+def compute_expected_jittered_ccg(M, N, x_A_arr, x_B_arr, t_overall, significance_level,
+                                  trials):
+    jittered_ccgs = []
+    for _ in range(trials):
+        jittered_spikes_A = jitter_spikes(M, x_A_arr)
+        jittered_spikes_B = jitter_spikes(M, x_B_arr)
+        jittered_ccg = compute_CCG(M, N, jittered_spikes_A, jittered_spikes_B,
+                                   t_overall, significance_level)
+        jittered_ccgs.append(jittered_ccg)
+
+    keys = jittered_ccgs[0].keys()
+    data = np.array([[d[key] for key in keys] for d in jittered_ccgs])
+    mean_values = np.mean(data, axis=0)
+    mean_ccg = dict(zip(keys, mean_values))
+
+    return mean_ccg
+
+
+def compute_CCG(M, N, x_A_arr, x_B_arr, t_overall, significance_level=4):
     if len(x_A_arr) == 0 or len(x_B_arr) == 0:
         return None
     """
@@ -92,9 +145,7 @@ def CCG(M, N, x_A_arr, x_B_arr, t_overall, significance_level=4):
     for lag in CCG_lags:
         CCG_lags[lag] /= M
 
-    significant_ccg = find_significant_peaks(list(CCG_lags.values()), list(CCG_lags.keys()), significance_level=significance_level)
-
-    return significant_ccg
+    return CCG_lags
 
 
 def get_min_key_value(ccg_dict):
@@ -109,18 +160,20 @@ def get_min_key_value(ccg_dict):
     return max_abs_value
 
 
-def get_functional_matrix(spike_trains, simulation_time, significance_level=4):
+def get_functional_matrix(spike_trains, simulation_time, significance_level=4, trials_jitter=10):
     N = spike_trains.shape[1]
     N_neurons = spike_trains.shape[0]
-    func_mat = np.full((N_neurons, N_neurons), 0)
+    func_mat = np.full((N_neurons, N_neurons), 0.0, dtype=np.float64)
     for i in tqdm(range(N_neurons)):
         for j in range(N_neurons):
-            if i!=j:
-                ccg_dict = CCG(M=1, N=N, x_A_arr=[spike_trains[i]], x_B_arr=[spike_trains[j]], t_overall=simulation_time, significance_level=significance_level)
+            if i != j:
+                ccg_dict = CCG(M=1, N=N, x_A_arr=[spike_trains[i]], x_B_arr=[spike_trains[j]],
+                               t_overall=simulation_time, significance_level=significance_level,
+                               trials_jitter=trials_jitter)
                 if len(ccg_dict) > 0:
-                    func_mat[i][j] = get_min_key_value(ccg_dict)
+                    func_mat[i][j] = float(get_min_key_value(ccg_dict))
 
     min_val = np.min(func_mat)
     max_val = np.max(func_mat)
-    #func_mat = 2*(func_mat - min_val) / (max_val - min_val) - 1
+    # func_mat = 2*(func_mat - min_val) / (max_val - min_val) - 1
     return func_mat

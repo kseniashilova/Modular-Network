@@ -46,10 +46,11 @@ neurons_per_module = 20
 simulation_time = 200
 betw_mods_weight = 10
 multiplier_input = 250
-multiplier_weights = 10
-significance_level = 2
-mode = 'noise'
+multiplier_weights = 100
+significance_level = 1
+# mode = 'noise'
 mode = 'natural scene'
+trials_jitter = 5
 
 number_of_neurons, spike_recorder, modules = run_network(image, neurons_per_module=neurons_per_module,
                                                          simulation_time=simulation_time,
@@ -66,7 +67,8 @@ binary_spike_trains = get_spike_trains(number_of_neurons, simulation_time,
 spike_trains = get_spike_trains_sliding_window(binary_spike_trains, window_size=10)
 spike_trains = np.array(spike_trains)
 
-func_matrix = get_functional_matrix(spike_trains, simulation_time, significance_level=significance_level)
+func_matrix = get_functional_matrix(spike_trains, simulation_time, significance_level=significance_level,
+                                    trials_jitter=trials_jitter)
 conn_matrix = get_conn_matrix(modules, number_of_neurons, betw_mods_weight=betw_mods_weight)
 
 draw_matrices(func_matrix, conn_matrix)

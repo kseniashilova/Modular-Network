@@ -62,22 +62,40 @@ def enumerate_motifs(G, hash_to_motif):
 
 
 def signed_pair_preserving_shuffle(G):
-    edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True)]
-    positive_edges = [(u, v, w) for u, v, w in edges if w > 0]
-    negative_edges = [(u, v, w) for u, v, w in edges if w < 0]
+    G_new = nx.DiGraph()
+    G_new.add_nodes_from(G.nodes(data=True))
+    pos_edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True) if d['weight'] > 0]
+    neg_edges = [(u, v, d['weight']) for u, v, d in G.edges(data=True) if d['weight'] < 0]
 
-    nodes = list(G.nodes())
-    np.random.shuffle(nodes)
-    node_mapping = dict(zip(G.nodes(), nodes))
+    def shuffle_edges(edges):
+        # Get the out-degree for each node based on edge list
+        from collections import defaultdict
+        out_degree = defaultdict(list)
+        for u, v, w in edges:
+            out_degree[u].append((v, w))
 
-    G_ref = nx.DiGraph()
-    G_ref.add_nodes_from(G.nodes())
+        # a new edge list with shuffled targets
+        available_targets = [(v, w) for _, v, w in edges]  # list of all targets
+        np.random.shuffle(available_targets)
 
-    for u, v, w in positive_edges + negative_edges:
-        new_u, new_v = node_mapping[u], node_mapping[v]
-        G_ref.add_edge(new_u, new_v, weight=w)
+        new_edges = []
+        target_idx = 0
+        for u in out_degree:
+            for _ in range(len(out_degree[u])):
+                v, w = available_targets[target_idx]
+                new_edges.append((u, v, w))
+                target_idx += 1
+        return new_edges
 
-    return G_ref
+    new_pos_edges = shuffle_edges(pos_edges)
+    new_neg_edges = shuffle_edges(neg_edges)
+
+    for u, v, w in new_pos_edges:
+        G_new.add_edge(u, v, weight=w)
+    for u, v, w in new_neg_edges:
+        G_new.add_edge(u, v, weight=w)
+
+    return G_new
 
 
 def generate_reference_network(G):
@@ -139,11 +157,43 @@ def find_motifs_in_graph(G, motif_hashes):
     return count
 
 
+def hash_of_2_edges(subgraph):
+    pass
+
+
 def parallel_enumerate_motifs(args):
     G, triplet = args
     subgraph = G.subgraph(triplet)
     motif_hash = nx.weisfeiler_lehman_graph_hash(subgraph)
-    return motif_hash, nx.to_numpy_array(subgraph)
+    # print(subgraph.edges(data=True))
+    return list(subgraph.edges(data=True)), motif_hash, nx.to_numpy_array(subgraph)
+
+
+def parallel_enumerate_motifs_edges(args):
+    edges = args
+    edges_dict = {}
+    for edge in edges:
+        min_edge = edge[0]
+        max_edge = edge[1]
+        weight = edge[2]['weight']
+        if min_edge > max_edge:
+            tmp = min_edge
+            min_edge = max_edge
+            max_edge = tmp
+        key_str = str(min_edge) + "," + str(max_edge)
+        if key_str in edges_dict:
+            edges_dict[key_str].append(weight)
+        else:
+            edges_dict[key_str] = [weight]
+    sums = []
+
+    for key in edges_dict:
+        sums.append((np.sum(edges_dict[key])))
+
+    sums = np.sort(sums)
+    res_str = "".join(map(str, sums))
+    return res_str
+
 
 
 def enumerate_motifs_parallel(G, hash_to_motif):
@@ -152,18 +202,28 @@ def enumerate_motifs_parallel(G, hash_to_motif):
     results = pool.map(parallel_enumerate_motifs, [(G, triplet) for triplet in triplets])
     pool.close()
     pool.join()
+    pool = Pool()
+    subgraph_edges = [result[0] for result in results]
 
+    results_edges = pool.map(parallel_enumerate_motifs_edges, subgraph_edges)
+    pool.close()
+    pool.join()
     motifs_counter = Counter()
 
-    for motif_hash, arr in tqdm(results):
+    i_res = 0
+    for _, motif_hash, arr in tqdm(results):
+        add_hash = results_edges[i_res]
+        motif_hash += add_hash
         motifs_counter[motif_hash] += 1
         if motif_hash not in hash_to_motif:
             hash_to_motif[motif_hash] = arr
+        i_res += 1
     return motifs_counter, hash_to_motif
 
 
 def save_motifs(matrix, path):
     matrix = np.nan_to_num(matrix, nan=0)
+    matrix = np.sign(matrix)
 
     print('save_motifs is running')
     z_scores_list = []
