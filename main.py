@@ -48,8 +48,8 @@ betw_mods_weight = 10
 multiplier_input = 250
 multiplier_weights = 100
 significance_level = 1
-# mode = 'noise'
-mode = 'natural scene'
+mode = 'noise'
+# mode = 'natural scene'
 trials_jitter = 5
 
 number_of_neurons, spike_recorder, modules = run_network(image, neurons_per_module=neurons_per_module,
